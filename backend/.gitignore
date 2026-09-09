@@ -1,0 +1,37 @@
+# ── Secrets — never commit these ──
+.env
+.env.local
+*.env
+!.env.example
+
+# ── Python (backend) ──
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# ── Node / React (frontend, once you get there) ──
+node_modules/
+dist/
+build/
+.next/
+.vite/
+
+# ── Uploaded files (Phase 5+) — don't commit user data ──
+backend/uploads/
+
+# ── Database ──
+*.sqlite3
+pgdata/
+
+# ── OS files ──
+.DS_Store
+Thumbs.db
+
+# ── Editor ──
+.vscode/*
+!.vscode/extensions.json
+.idea/
