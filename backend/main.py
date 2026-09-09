@@ -9,20 +9,11 @@ from openai import OpenAI
 
 load_dotenv()
 
-ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv(
-        "ALLOWED_ORIGINS",
-        "https://christianaguilargithub.github.io,http://localhost:8000"
-    ).split(",")
-    if origin.strip()
-]
-
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
