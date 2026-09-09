@@ -1,4 +1,4 @@
-  const DEFAULT_API = 'http://127.0.0.1:8000/chat';
+  const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
   const appState = {
     apiUrl: localStorage.getItem('pokedex_api_url') || DEFAULT_API,
   };
