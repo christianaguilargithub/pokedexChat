@@ -1,4 +1,4 @@
-  const DEFAULT_API = 'https://wild-salad-6df8.aguilar-chris9123.workers.dev/chat';
+const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
   const appState = {
     apiUrl: localStorage.getItem('pokedex_api_url') || DEFAULT_API,
   };
