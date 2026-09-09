@@ -164,8 +164,8 @@
       addBotMessage(data.reply || '(no reply)');
       setStatus('ready');
 
-      const guessed = guessName(text);
-      updateSprite(data.image_url || null, guessed);
+      const pokemonName = data.pokemon?.name || guessName(text);
+      updateSprite(data.image_url || null, pokemonName);
     } catch (err) {
       hideTyping();
 

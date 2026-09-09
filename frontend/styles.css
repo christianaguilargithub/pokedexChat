@@ -177,13 +177,25 @@
     justify-content: center;
     image-rendering: pixelated;
   }
-  .sprite-frame img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 4px rgba(0,0,0,0.25)); }
+  .sprite-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 6px 4px rgba(0,0,0,0.25));
+    animation: float 4s ease-in-out infinite;
+  }
 
   .pokeball-idle {
     width: 90px; height: 90px;
-    animation: float 2.6s ease-in-out infinite;
+    animation: pokeballFloat 2.6s ease-in-out infinite;
   }
+
   @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  @keyframes pokeballFloat {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-10px); }
   }
