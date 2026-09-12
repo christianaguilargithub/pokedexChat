@@ -4,6 +4,10 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
     apiUrl: localStorage.getItem('pokedex_api_url') || DEFAULT_API,
   };
 
+  const CHAT_HISTORY_KEY = 'pokedex_chat_history';
+  const SPRITE_STATE_KEY = 'pokedex_sprite_state';
+  const chatHistory = [];
+
   const chatLog = document.getElementById('chatLog');
   const form = document.getElementById('composerForm');
   const input = document.getElementById('msgInput');
@@ -22,17 +26,30 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
     return trimmed || DEFAULT_API;
   }
 
+  function persistSpriteState() {
+    const img = spriteFrame.querySelector('img');
+    const snapshot = {
+      imageUrl: img ? img.src : null,
+      name: spriteLabel.textContent || '',
+      subtitle: spriteSub.textContent || '',
+    };
+
+    sessionStorage.setItem(SPRITE_STATE_KEY, JSON.stringify(snapshot));
+  }
+
   function resetSprite(name = '') {
     if (name) {
       spriteFrame.innerHTML = '';
       spriteLabel.textContent = name.toUpperCase();
       spriteSub.textContent = 'No sprite available';
+      persistSpriteState();
       return;
     }
 
     spriteFrame.innerHTML = pokeballSVG;
     spriteLabel.textContent = '';
     spriteSub.textContent = '';
+    persistSpriteState();
   }
 
   function updateSprite(imageUrl, name) {
@@ -54,6 +71,7 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
     spriteFrame.appendChild(img);
     spriteLabel.textContent = (name || 'UNKNOWN').toUpperCase();
     spriteSub.textContent = 'Scan complete';
+    persistSpriteState();
   }
 
   function escapeHtml(text) {
@@ -167,6 +185,60 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
   function addBotMessage(text, isError) { return addRow(text, 'bot', isError); }
   function addUserMessage(text) { return addRow(text, 'user'); }
 
+  function persistChatHistory() {
+    sessionStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(chatHistory));
+  }
+
+  function loadChatHistory() {
+    const raw = sessionStorage.getItem(CHAT_HISTORY_KEY);
+    if (!raw) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return;
+      }
+
+      chatHistory.length = 0;
+
+      parsed.forEach((entry) => {
+        if (entry?.who === 'user') {
+          chatHistory.push({ who: 'user', text: entry.text || '' });
+          addUserMessage(entry.text || '');
+        } else if (entry?.who === 'bot') {
+          chatHistory.push({ who: 'bot', text: entry.text || '' });
+          addBotMessage(entry.text || '');
+        }
+      });
+    } catch (error) {
+      sessionStorage.removeItem(CHAT_HISTORY_KEY);
+    }
+  }
+
+  function restoreSpriteState() {
+    const raw = sessionStorage.getItem(SPRITE_STATE_KEY);
+    if (!raw) {
+      resetSprite();
+      return;
+    }
+
+    try {
+      const snapshot = JSON.parse(raw);
+      if (snapshot?.imageUrl) {
+        updateSprite(snapshot.imageUrl, snapshot.name || '');
+      } else if (snapshot?.name) {
+        resetSprite(snapshot.name);
+      } else {
+        resetSprite();
+      }
+    } catch (error) {
+      sessionStorage.removeItem(SPRITE_STATE_KEY);
+      resetSprite();
+    }
+  }
+
   function showTyping() {
     const row = document.createElement('div');
     row.className = 'row bot';
@@ -222,6 +294,9 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
 
   async function sendMessage(text) {
     addUserMessage(text);
+    chatHistory.push({ who: 'user', text });
+    persistChatHistory();
+
     input.value = '';
     setBusyState(true);
     setStatus('busy');
@@ -252,11 +327,15 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
 
       if (data.error) {
         addBotMessage(`Error: ${data.error}`, true);
+        chatHistory.push({ who: 'bot', text: `Error: ${data.error}` });
+        persistChatHistory();
         setStatus('error');
         return;
       }
 
       addBotMessage(data.reply || '(no reply)');
+      chatHistory.push({ who: 'bot', text: data.reply || '(no reply)' });
+      persistChatHistory();
       setStatus('ready');
 
       const pokemonName = data.pokemon?.name || guessName(text);
@@ -325,7 +404,15 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
 
   appState.apiUrl = normalizeApiUrl(appState.apiUrl);
   localStorage.setItem('pokedex_api_url', appState.apiUrl);
-  resetSprite();
 
-  addBotMessage('Pokédex online. Ask me about any Pokémon — types, abilities, evolutions, or trivia.');
+  const existingHistory = sessionStorage.getItem(CHAT_HISTORY_KEY);
+  if (existingHistory) {
+    loadChatHistory();
+    restoreSpriteState();
+  } else {
+    resetSprite();
+    addBotMessage('Pokédex online. Ask me about any Pokémon — types, abilities, evolutions, or trivia.');
+    persistChatHistory();
+  }
+
   input.focus();
