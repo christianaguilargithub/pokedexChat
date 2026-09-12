@@ -355,7 +355,11 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
       }
 
       setBusyState(false);
-      input.focus();
+
+      const isMobile = window.matchMedia('(max-width: 760px)').matches;
+      if (!isMobile) {
+        input.focus();
+      }
     }
   }
 
@@ -378,6 +382,7 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
       return;
     }
 
+    input.blur();
     sendMessage(text);
   });
 
