@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,6 +34,29 @@ MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 
 class ChatRequest(BaseModel):
     message: str
+
+
+def extract_pokemon_name(message: str):
+    cleaned = message.strip()
+    prefixes = [
+        'tell me about ',
+        'what do you know about ',
+        'information about ',
+        'what is ',
+        'who is ',
+        'pokemon ',
+        'pokémon ',
+    ]
+
+    for prefix in prefixes:
+        if cleaned.lower().startswith(prefix):
+            return cleaned[len(prefix):].strip()
+
+    match = re.search(r'\b(?:pokemon|pokémon)\s+([a-zA-Z-]+)\b', cleaned, re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+
+    return None
 
 
 def get_pokemon(name: str):
@@ -147,63 +171,49 @@ def health_check():
 @app.post("/chat")
 def chat(request: ChatRequest):
     try:
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are a helpful Pokémon expert assistant. Use the provided "
-                    "tools when the user asks about a specific Pokémon's stats, "
-                    "types, generation, or evolution. For general Pokémon trivia, "
-                    "anime/game lore, or questions not covered by the tools "
-                    "(e.g. 'what is Ash's first Pokémon'), answer directly from "
-                    "your own knowledge."
-                ),
-            },
-            {"role": "user", "content": request.message},
-        ]
+        pokemon_name = extract_pokemon_name(request.message)
+        pokemon_data = {}
+        image_url = None
+
+        if pokemon_name:
+            pokemon_result = get_pokemon(pokemon_name)
+
+            if isinstance(pokemon_result, dict) and not pokemon_result.get("error"):
+                pokemon_data.update(pokemon_result)
+                image_url = pokemon_result.get("image_url") or pokemon_result.get("sprite_url")
+
+                species_result = get_pokemon_species(pokemon_name)
+                if isinstance(species_result, dict) and not species_result.get("error"):
+                    pokemon_data.update(species_result)
+
+        extra_context = ""
+        if pokemon_data:
+            extra_context = (
+                "Use the following Pokémon data as your source of truth when answering.\n"
+                f"{json.dumps(pokemon_data, ensure_ascii=False, indent=2)}\n\n"
+            )
+
+        system_message = (
+            "You are a helpful Pokémon expert assistant. "
+            "Answer clearly and concisely. If Pokémon data is provided in the user message, use it to answer accurately. "
+            "For general Pokémon trivia or anime/game lore, answer from your own knowledge."
+        )
+
+        user_content = (
+            f"{extra_context}User question: {request.message}"
+            if extra_context
+            else request.message
+        )
 
         response = client.chat.completions.create(
             model=MODEL,
-            messages=messages,
-            tools=TOOLS,
-            tool_choice="auto",
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_content},
+            ],
         )
 
         msg = response.choices[0].message
-        image_url = None
-        pokemon_data = {}
-        max_tool_rounds = 5
-
-        while msg.tool_calls and max_tool_rounds > 0:
-            messages.append(msg)
-
-            for call in msg.tool_calls:
-                args = json.loads(call.function.arguments)
-                func = AVAILABLE_FUNCTIONS.get(call.function.name)
-                result = func(**args) if func else {"error": "Unknown tool"}
-
-                if isinstance(result, dict) and result.get("image_url"):
-                    image_url = result["image_url"]
-
-                if isinstance(result, dict) and any(
-                    key in result for key in ["types", "abilities", "height_m", "weight_kg", "base_stats", "sprite_url", "generation", "habitat"]
-                ):
-                    pokemon_data.update(result)
-
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": call.id,
-                    "content": json.dumps(result),
-                })
-
-            response = client.chat.completions.create(
-                model=MODEL,
-                messages=messages,
-                tools=TOOLS,
-                tool_choice="auto",
-            )
-            msg = response.choices[0].message
-            max_tool_rounds -= 1
 
         payload = {
             "reply": msg.content or "",

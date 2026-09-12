@@ -122,9 +122,10 @@
   .screens {
     flex: 1;
     display: grid;
-    grid-template-columns: 400px 1fr;
-    gap: 18px;
-    padding: 20px 24px;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 12px;
+    padding: 12px;
     min-height: 0;
   }
 
@@ -170,8 +171,8 @@
     gap: 10px;
   }
   .sprite-frame {
-    width: 260px;
-    height: 260px;
+    width: min(58vw, 200px);
+    height: min(58vw, 200px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -208,12 +209,14 @@
     letter-spacing: 1px;
   }
   .sprite-sub {
+    display: none;
     font-family: var(--font-body);
     font-size: 19px;
     color: var(--ink-soft);
   }
 
   .hint-box {
+    display: none;
     margin-top: auto;
     border-top: 2px dashed rgba(28,43,31,0.3);
     padding-top: 10px;
@@ -375,10 +378,53 @@
   .config-btn:hover { border-color: #fff; }
 
   @media (max-width: 760px) {
-    .screens { grid-template-columns: 1fr; grid-template-rows: 200px 1fr; }
-    .sprite-frame {
-      width: 130px;
-      height: 130px;
+    .topbar {
+      gap: 8px 10px;
+      padding: 12px 12px;
+      flex-wrap: nowrap;
+      overflow: hidden;
     }
-    .dpad { display: none; }
+
+    .title {
+      margin-left: 0;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .status-pill {
+      margin-left: auto;
+      flex-shrink: 0;
+      padding: 4px 10px;
+    }
+
+    .config-btn {
+      margin-left: -2px;
+      flex-shrink: 0;
+    }
+
+    .bubble {
+      max-width: 100%;
+      font-size: 20px;
+    }
+  }
+
+  @media (min-width: 761px) {
+    .screens {
+      grid-template-columns: 400px 1fr;
+      grid-template-rows: 1fr;
+      gap: 18px;
+      padding: 20px 24px;
+    }
+
+    .sprite-sub,
+    .hint-box {
+      display: block;
+    }
+
+    .sprite-frame {
+      width: 260px;
+      height: 260px;
+    }
+
+    .dpad { display: block; }
   }
