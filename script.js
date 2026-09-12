@@ -302,6 +302,14 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
     sendMessage(text);
   });
 
+  function updateKeyboardState() {
+    const isMobile = window.matchMedia('(max-width: 760px)').matches;
+    document.body.classList.toggle('mobile-keyboard-open', isMobile && document.activeElement === input);
+  }
+
+  input.addEventListener('focus', updateKeyboardState);
+  input.addEventListener('blur', updateKeyboardState);
+
   appState.apiUrl = normalizeApiUrl(appState.apiUrl);
   localStorage.setItem('pokedex_api_url', appState.apiUrl);
   resetSprite();

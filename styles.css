@@ -472,6 +472,15 @@
       max-width: 100%;
       font-size: 20px;
     }
+
+    body.mobile-keyboard-open .screen-frame:first-child {
+      display: none;
+    }
+
+    body.mobile-keyboard-open .screens {
+      grid-template-rows: 1fr;
+      padding-bottom: 10px;
+    }
   }
 
   @media (min-width: 761px) and (max-width: 899px) {
