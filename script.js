@@ -22,15 +22,22 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
     return trimmed || DEFAULT_API;
   }
 
-  function resetSprite() {
+  function resetSprite(name = '') {
+    if (name) {
+      spriteFrame.innerHTML = '';
+      spriteLabel.textContent = name.toUpperCase();
+      spriteSub.textContent = 'No sprite available';
+      return;
+    }
+
     spriteFrame.innerHTML = pokeballSVG;
-    spriteLabel.textContent = 'NO DATA';
-    spriteSub.textContent = 'Ask about a Pokémon to scan it';
+    spriteLabel.textContent = '';
+    spriteSub.textContent = '';
   }
 
   function updateSprite(imageUrl, name) {
     if (!imageUrl) {
-      resetSprite();
+      resetSprite(name);
       return;
     }
 
@@ -49,6 +56,87 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
     spriteSub.textContent = 'Scan complete';
   }
 
+  function escapeHtml(text) {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function formatInlineText(text) {
+    let html = escapeHtml(text);
+
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+
+    return html;
+  }
+
+  function formatBotMessage(text) {
+    const lines = (text || '').replace(/\r/g, '').split('\n');
+    const formatted = [];
+    let tableLines = [];
+
+    function flushTable() {
+      if (tableLines.length < 2) {
+        formatted.push(...tableLines.map(line => formatInlineText(line)));
+        tableLines = [];
+        return;
+      }
+
+      const rows = tableLines
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(line => line.replace(/^\|/, '').replace(/\|$/, '').split('|').map(part => part.trim()));
+
+      if (rows.length >= 2) {
+        const header = rows[0];
+        const body = rows.slice(2);
+
+        const thead = `<thead><tr>${header.map(cell => `<th>${formatInlineText(cell)}</th>`).join('')}</tr></thead>`;
+        const tbody = body.length
+          ? `<tbody>${body.map(row => `<tr>${row.map(cell => `<td>${formatInlineText(cell)}</td>`).join('')}</tr>`).join('')}</tbody>`
+          : '';
+
+        formatted.push(`<table><thead><tr>${header.map(cell => `<th>${formatInlineText(cell)}</th>`).join('')}</tr></thead>${tbody}</table>`);
+      } else {
+        formatted.push(...tableLines.map(line => formatInlineText(line)));
+      }
+
+      tableLines = [];
+    }
+
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = lines[i].trim();
+
+      if (line.includes('|')) {
+        tableLines.push(line);
+        continue;
+      }
+
+      if (tableLines.length) {
+        flushTable();
+      }
+
+      if (!line) {
+        formatted.push('<br>');
+        continue;
+      }
+
+      formatted.push(formatInlineText(line));
+    }
+
+    if (tableLines.length) {
+      flushTable();
+    }
+
+    return formatted.join('<br>');
+  }
+
   function addRow(text, who, isError) {
     const row = document.createElement('div');
     row.className = 'row ' + who;
@@ -61,7 +149,13 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
     prefix.textContent = who === 'user' ? 'YOU' : 'DEX';
 
     bubble.appendChild(prefix);
-    bubble.appendChild(document.createTextNode(text));
+
+    if (who === 'bot') {
+      bubble.insertAdjacentHTML('beforeend', formatBotMessage(text));
+    } else {
+      bubble.appendChild(document.createTextNode(text));
+    }
+
     row.appendChild(bubble);
 
     chatLog.appendChild(row);
@@ -210,6 +304,7 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
 
   appState.apiUrl = normalizeApiUrl(appState.apiUrl);
   localStorage.setItem('pokedex_api_url', appState.apiUrl);
+  resetSprite();
 
   addBotMessage('Pokédex online. Ask me about any Pokémon — types, abilities, evolutions, or trivia.');
   input.focus();

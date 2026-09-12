@@ -255,6 +255,41 @@
     white-space: pre-wrap;
     word-wrap: break-word;
   }
+
+  .bubble table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0;
+    font-size: 0.9em;
+    line-height: 1.2;
+  }
+
+  .bubble th,
+  .bubble td {
+    border: 1px solid rgba(28, 43, 31, 0.35);
+    padding: 4px 6px;
+    vertical-align: top;
+    text-align: left;
+  }
+
+  .bubble th {
+    background: rgba(28, 43, 31, 0.08);
+    font-family: var(--font-display);
+    font-size: 0.78em;
+    letter-spacing: 0.05em;
+  }
+
+  .bubble a {
+    color: inherit;
+    text-decoration: underline;
+  }
+
+  .bubble code {
+    background: rgba(28, 43, 31, 0.08);
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 0.85em;
+  }
   .row.user .bubble {
     background: var(--blue);
     color: #EAF6FF;
@@ -408,7 +443,29 @@
     }
   }
 
-  @media (min-width: 761px) {
+  @media (min-width: 761px) and (max-width: 899px) {
+    .topbar {
+      gap: 12px;
+      padding: 12px 16px;
+    }
+
+    .title {
+      font-size: 13px;
+      letter-spacing: 1px;
+    }
+
+    .status-pill {
+      font-size: 18px;
+      padding: 4px 12px;
+    }
+
+    .sprite-frame {
+      width: min(42vw, 180px);
+      height: min(42vw, 180px);
+    }
+  }
+
+  @media (min-width: 900px) {
     .screens {
       grid-template-columns: 400px 1fr;
       grid-template-rows: 1fr;
