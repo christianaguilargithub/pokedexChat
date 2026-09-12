@@ -32,7 +32,7 @@
   }
 
   .device {
-    height: 100vh;
+    height: var(--app-height, 100dvh);
     min-height: 100dvh;
     width: 100vw;
     background: linear-gradient(180deg, var(--red-shine) 0%, var(--red) 8%, var(--red) 92%, var(--red-dark) 100%);

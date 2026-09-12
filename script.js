@@ -386,7 +386,14 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
     sendMessage(text);
   });
 
+  function updateViewportHeight() {
+    const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    document.documentElement.style.setProperty('--app-height', `${viewportHeight}px`);
+  }
+
   function updateKeyboardState() {
+    updateViewportHeight();
+
     const isMobile = window.matchMedia('(max-width: 760px)').matches;
 
     if (!isMobile) {
