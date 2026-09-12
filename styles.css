@@ -24,13 +24,16 @@
   html, body {
     margin: 0;
     height: 100%;
+    min-height: 100dvh;
     background: radial-gradient(circle at 50% 0%, #3a3a3a 0%, #161616 70%);
     font-family: var(--font-body);
     overflow: hidden;
+    overscroll-behavior: none;
   }
 
   .device {
     height: 100vh;
+    min-height: 100dvh;
     width: 100vw;
     background: linear-gradient(180deg, var(--red-shine) 0%, var(--red) 8%, var(--red) 92%, var(--red-dark) 100%);
     display: flex;
@@ -435,6 +438,34 @@
     .config-btn {
       margin-left: -2px;
       flex-shrink: 0;
+    }
+
+    .deck {
+      gap: 10px;
+      padding: 12px 12px 16px;
+      align-items: center;
+    }
+
+    .dpad {
+      display: none;
+    }
+
+    form.composer {
+      flex: 1;
+      min-width: 0;
+      gap: 10px;
+    }
+
+    .msg-input {
+      font-size: 20px;
+      padding: 10px 12px;
+      min-width: 0;
+    }
+
+    .send-btn {
+      width: 60px;
+      height: 60px;
+      font-size: 12px;
     }
 
     .bubble {
