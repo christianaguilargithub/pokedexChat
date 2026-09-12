@@ -311,7 +311,7 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
     }
 
     const viewport = window.visualViewport;
-    const keyboardOpen = document.activeElement === input && !!viewport && (window.innerHeight - viewport.height) > 120;
+    const keyboardOpen = !!viewport && (window.innerHeight - viewport.height) > 120;
 
     document.body.classList.toggle('mobile-keyboard-open', keyboardOpen);
   }
