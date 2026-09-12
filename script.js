@@ -304,11 +304,24 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
 
   function updateKeyboardState() {
     const isMobile = window.matchMedia('(max-width: 760px)').matches;
-    document.body.classList.toggle('mobile-keyboard-open', isMobile && document.activeElement === input);
+
+    if (!isMobile) {
+      document.body.classList.remove('mobile-keyboard-open');
+      return;
+    }
+
+    const viewport = window.visualViewport;
+    const keyboardOpen = document.activeElement === input && !!viewport && (window.innerHeight - viewport.height) > 120;
+
+    document.body.classList.toggle('mobile-keyboard-open', keyboardOpen);
   }
 
   input.addEventListener('focus', updateKeyboardState);
-  input.addEventListener('blur', updateKeyboardState);
+  input.addEventListener('blur', () => document.body.classList.remove('mobile-keyboard-open'));
+  window.addEventListener('resize', updateKeyboardState);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updateKeyboardState);
+  }
 
   appState.apiUrl = normalizeApiUrl(appState.apiUrl);
   localStorage.setItem('pokedex_api_url', appState.apiUrl);
