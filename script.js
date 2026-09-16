@@ -6,6 +6,9 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
 
   const CHAT_HISTORY_KEY = 'pokedex_chat_history';
   const SPRITE_STATE_KEY = 'pokedex_sprite_state';
+  const REQUEST_TIMEOUT_MS = 30000;
+  const MAX_REQUEST_ATTEMPTS = 6;
+  const RETRY_DELAY_MS = 2000;
   const chatHistory = [];
 
   const chatLog = document.getElementById('chatLog');
@@ -52,19 +55,51 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
     persistSpriteState();
   }
 
-  function updateSprite(imageUrl, name) {
-    if (!imageUrl) {
+  async function loadFallbackSprite(name) {
+    if (!name) {
+      resetSprite();
+      return;
+    }
+
+    spriteLabel.textContent = name.toUpperCase();
+    spriteSub.textContent = 'Loading sprite...';
+
+    try {
+      const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${encodeURIComponent(name.toLowerCase())}`);
+      if (!response.ok) {
+        throw new Error(`Sprite lookup failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const fallbackUrl = data.sprites?.other?.['official-artwork']?.front_default || data.sprites?.front_default;
+      updateSprite(fallbackUrl, name, false);
+    } catch (error) {
       resetSprite(name);
+    }
+  }
+
+  function updateSprite(imageUrl, name, allowFallback = true) {
+    if (!imageUrl) {
+      if (allowFallback) {
+        loadFallbackSprite(name);
+      } else {
+        resetSprite(name);
+      }
       return;
     }
 
     const img = document.createElement('img');
     img.src = imageUrl;
     img.alt = name || 'Pokémon';
-    img.loading = 'lazy';
+    img.loading = 'eager';
     img.decoding = 'async';
+    img.referrerPolicy = 'no-referrer';
     img.addEventListener('error', () => {
-      resetSprite();
+      if (allowFallback) {
+        loadFallbackSprite(name);
+      } else {
+        resetSprite(name);
+      }
     });
 
     spriteFrame.innerHTML = '';
@@ -95,9 +130,21 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
   }
 
   function formatBotMessage(text) {
-    const lines = (text || '').replace(/\r/g, '').split('\n');
+    const lines = (text || '')
+      .replace(/\r/g, '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .split('\n');
     const formatted = [];
     let tableLines = [];
+
+    function isTableRow(line) {
+      return /^\|.*\|$/.test(line);
+    }
+
+    function isTableDivider(line) {
+      const cells = line.replace(/^\||\|$/g, '').split('|');
+      return cells.length >= 2 && cells.every(cell => /^\s*:?-{3,}:?\s*$/.test(cell));
+    }
 
     function flushTable() {
       if (tableLines.length < 2) {
@@ -120,7 +167,8 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
           ? `<tbody>${body.map(row => `<tr>${row.map(cell => `<td>${formatInlineText(cell)}</td>`).join('')}</tr>`).join('')}</tbody>`
           : '';
 
-        formatted.push(`<table><thead><tr>${header.map(cell => `<th>${formatInlineText(cell)}</th>`).join('')}</tr></thead>${tbody}</table>`);
+        const tableClass = header.length > 4 ? ' class="wide-table"' : '';
+        formatted.push(`<div class="table-wrap"><table${tableClass}><thead><tr>${header.map(cell => `<th>${formatInlineText(cell)}</th>`).join('')}</tr></thead>${tbody}</table></div>`);
       } else {
         formatted.push(...tableLines.map(line => formatInlineText(line)));
       }
@@ -131,7 +179,8 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
     for (let i = 0; i < lines.length; i += 1) {
       const line = lines[i].trim();
 
-      if (line.includes('|')) {
+      const nextLine = lines[i + 1]?.trim() || '';
+      if (isTableRow(line) && (tableLines.length || isTableDivider(nextLine))) {
         tableLines.push(line);
         continue;
       }
@@ -243,8 +292,16 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
     const row = document.createElement('div');
     row.className = 'row bot';
     row.id = 'typingRow';
-    row.innerHTML = '<div class="bubble typing"><span class="prefix">DEX</span>Scanning<span class="dots"></span></div>';
+    row.innerHTML = '<div class="bubble typing"><span class="prefix">DEX</span><span class="typing-text">Scanning</span><span class="dots"></span></div>';
     chatLog.appendChild(row);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  function updateTyping(text) {
+    const typingText = document.querySelector('#typingRow .typing-text');
+    if (typingText) {
+      typingText.textContent = text;
+    }
     chatLog.scrollTop = chatLog.scrollHeight;
   }
 
@@ -275,7 +332,7 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
 
   function guessName(userText) {
     const cleaned = userText.toLowerCase().trim().replace(/[?.!]+$/, '');
-    const prefixes = ['tell me about ', 'what do you know about ', 'information about ', 'what is ', 'who is ', 'pokemon '];
+    const prefixes = ['tell me about ', 'what do you know about ', 'information about ', 'what is ', 'who is ', 'pokemon ', 'pokémon '];
 
     for (const prefix of prefixes) {
       if (cleaned.startsWith(prefix)) {
@@ -292,6 +349,58 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
     sendBtn.setAttribute('aria-busy', String(isBusy));
   }
 
+  function wait(ms) {
+    return new Promise(resolve => window.setTimeout(resolve, ms));
+  }
+
+  async function requestChat(text) {
+    let lastError;
+
+    for (let attempt = 1; attempt <= MAX_REQUEST_ATTEMPTS; attempt += 1) {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+      try {
+        const res = await fetch(appState.apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          const error = new Error(`Server responded ${res.status}`);
+          error.retryable = res.status === 408 || res.status === 425 || res.status === 429 || res.status >= 500;
+          throw error;
+        }
+
+        const data = await res.json();
+        if (data.error) {
+          const error = new Error(data.error);
+          error.retryable = true;
+          throw error;
+        }
+
+        return data;
+      } catch (error) {
+        lastError = error;
+        const retryable = error.retryable !== false;
+
+        if (!retryable || attempt === MAX_REQUEST_ATTEMPTS) {
+          throw error;
+        }
+
+        updateTyping(attempt === 1 ? 'Waking backend' : 'Still loading');
+        setStatus('busy');
+        await wait(RETRY_DELAY_MS);
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    throw lastError;
+  }
+
   async function sendMessage(text) {
     addUserMessage(text);
     chatHistory.push({ who: 'user', text });
@@ -302,27 +411,13 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
     setStatus('busy');
     showTyping();
 
-    let controller;
-    let timeoutId;
+    const searchedPokemon = guessName(text);
+    if (searchedPokemon) {
+      loadFallbackSprite(searchedPokemon);
+    }
 
     try {
-      controller = new AbortController();
-      timeoutId = window.setTimeout(() => controller.abort(), 15000);
-
-      const res = await fetch(appState.apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
-        signal: controller.signal,
-      });
-
-      window.clearTimeout(timeoutId);
-
-      if (!res.ok) {
-        throw new Error(`Server responded ${res.status}`);
-      }
-
-      const data = await res.json();
+      const data = await requestChat(text);
       hideTyping();
 
       if (data.error) {
@@ -339,21 +434,21 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
       setStatus('ready');
 
       const pokemonName = data.pokemon?.name || guessName(text);
-      updateSprite(data.image_url || null, pokemonName);
+      const spriteUrl = data.image_url || data.sprite_url || data.pokemon?.image_url || data.pokemon?.sprite_url;
+      const fallbackSpriteUrl = spriteUrl || (pokemonName
+        ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${encodeURIComponent(pokemonName.toLowerCase())}.png`
+        : null);
+      updateSprite(fallbackSpriteUrl, pokemonName);
     } catch (err) {
       hideTyping();
 
-      const message = err?.name === 'AbortError'
-        ? `Request timed out while contacting the backend at ${appState.apiUrl}.`
+      const message = err?.name === 'AbortError' || err?.retryable
+        ? `The backend is still waking up. Please try again in a moment at ${appState.apiUrl}.`
         : `Couldn't reach the backend at ${appState.apiUrl}. Is the FastAPI server running? (${err.message})`;
 
       addBotMessage(message, true);
       setStatus('error');
     } finally {
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-      }
-
       setBusyState(false);
 
       const isMobile = window.matchMedia('(max-width: 760px)').matches;
@@ -417,14 +512,10 @@ const DEFAULT_API = 'https://pokedexchat.onrender.com/chat';
   appState.apiUrl = normalizeApiUrl(appState.apiUrl);
   localStorage.setItem('pokedex_api_url', appState.apiUrl);
 
-  const existingHistory = sessionStorage.getItem(CHAT_HISTORY_KEY);
-  if (existingHistory) {
-    loadChatHistory();
-    restoreSpriteState();
-  } else {
-    resetSprite();
-    addBotMessage('Pokédex online. Ask me about any Pokémon — types, abilities, evolutions, or trivia.');
-    persistChatHistory();
-  }
+  sessionStorage.removeItem(CHAT_HISTORY_KEY);
+  sessionStorage.removeItem(SPRITE_STATE_KEY);
+  resetSprite();
+  addBotMessage('Pokédex online. Ask me about any Pokémon — types, abilities, evolutions, or trivia.');
+  persistChatHistory();
 
   input.focus();

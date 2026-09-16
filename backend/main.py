@@ -4,6 +4,7 @@ import re
 import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -218,6 +219,7 @@ def chat(request: ChatRequest):
         payload = {
             "reply": msg.content or "",
             "image_url": image_url,
+            "sprite_url": image_url,
         }
 
         if pokemon_data:
@@ -228,4 +230,7 @@ def chat(request: ChatRequest):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return {"error": str(e)}
+        return JSONResponse(
+            status_code=503,
+            content={"error": "The backend is waking up or temporarily unavailable. Please retry."},
+        )
